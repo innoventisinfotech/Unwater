@@ -66,5 +66,6 @@ Full build spec lives in the plan — read it before non-trivial work:
 - README must keep the legitimate-use notice.
 
 ## Current status
-- Phase: **1 (image remover, Tier 1) — COMPLETE.** Next: Phase 2 (model lifecycle UX). Update this line as phases complete.
+- Phase: **1 (image remover, Tier 1) — COMPLETE.** **Auto-detect (TEXT watermarks) — COMPLETE** (RapidOCR PP-OCRv4 DBNet → maskBuilder → Tier1 inpaint; Auto-detect + Auto-remove UI). Next: logo auto-detect (Florence-2, separate plan) and/or Phase 2 model-lifecycle UX. Update this line as phases complete.
+- Auto-detect deviates from plan §13 (which deferred detection to v2) per explicit user request. Tiled/repeated overlays remain deferred. Specs/plans in `docs/superpowers/`.
 - Model cache dir is `<project>/models/` (in-project, per user requirement — NOT C:/userData). Revisit for packaging in Phase 6.
