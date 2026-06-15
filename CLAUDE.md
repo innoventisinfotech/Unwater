@@ -66,4 +66,5 @@ Full build spec lives in the plan — read it before non-trivial work:
 - README must keep the legitimate-use notice.
 
 ## Current status
-- Phase: **0 (scaffold) — COMPLETE.** Next: Phase 1 (image remover, Tier 1). Update this line as phases complete.
+- Phase: **1 (image remover, Tier 1) — COMPLETE.** Next: Phase 2 (model lifecycle UX). Update this line as phases complete.
+- Model cache dir is `<project>/models/` (in-project, per user requirement — NOT C:/userData). Revisit for packaging in Phase 6.

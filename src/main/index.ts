@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
-import { PING_RESPONSE } from '../shared/constants'
+import { registerIpc } from './ipc/handlers'
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -29,9 +29,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  // Phase 0 IPC: a single typed ping handler proves the main<->preload<->renderer round-trip.
-  ipcMain.handle('app:ping', () => PING_RESPONSE)
-
+  registerIpc()
   createWindow()
 
   app.on('activate', () => {
