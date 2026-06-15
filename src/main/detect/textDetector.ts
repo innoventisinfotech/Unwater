@@ -70,15 +70,21 @@ export class TextDetector {
     for (let i = 0; i < plane; i++) {
       probBytes[i] = Math.round(Math.min(Math.max(probF[i], 0), 1) * 255)
     }
-    const resized = await sharp(Buffer.from(probBytes), { raw: { width: w, height: h, channels: 1 } })
+    const { data: resized, info } = await sharp(Buffer.from(probBytes), {
+      raw: { width: w, height: h, channels: 1 }
+    })
       .resize(srcW, srcH, { fit: 'fill' })
       .raw()
-      .toBuffer()
+      .toBuffer({ resolveWithObject: true })
 
-    return {
-      conf: new Uint8Array(resized.buffer, resized.byteOffset, resized.byteLength),
-      width: srcW,
-      height: srcH
+    // sharp may emit the resized raw with >1 channel; de-interleave to a single-channel map.
+    const ch = info.channels
+    const conf = new Uint8Array(srcW * srcH)
+    if (ch === 1) {
+      conf.set(resized.subarray(0, srcW * srcH))
+    } else {
+      for (let i = 0; i < srcW * srcH; i++) conf[i] = resized[i * ch]
     }
+    return { conf, width: srcW, height: srcH }
   }
 }

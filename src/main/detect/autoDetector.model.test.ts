@@ -1,0 +1,54 @@
+/**
+ * End-to-end auto-detect test against the REAL PP-OCRv4 model.
+ * Gated behind RUN_MODEL_IT=1 (downloads ~4.7 MB once into <project>/models). Run with:
+ *   RUN_MODEL_IT=1 npx vitest run src/main/detect/autoDetector.model.test.ts
+ */
+import { describe, it, expect } from 'vitest'
+import { mkdtemp, rm } from 'fs/promises'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import sharp from 'sharp'
+
+const RUN = process.env.RUN_MODEL_IT === '1'
+const W = 640
+const H = 360
+
+/** White image with bold black "WATERMARK" text drawn via an SVG overlay. */
+async function makeTextFixture(dir: string): Promise<string> {
+  const svg = `<svg width="${W}" height="${H}"><rect width="100%" height="100%" fill="white"/>
+    <text x="50%" y="55%" font-family="Arial" font-size="64" font-weight="bold"
+      text-anchor="middle" fill="black">WATERMARK</text></svg>`
+  const p = join(dir, 'text.png')
+  await sharp(Buffer.from(svg)).png().toFile(p)
+  return p
+}
+
+describe.runIf(RUN)('autoDetect end-to-end (real PP-OCRv4 model)', () => {
+  it('produces a mask that covers the text and leaves the corners clean', async () => {
+    // Import lazily so the heavy model code is only touched when the gate is on.
+    const { autoDetect } = await import('./autoDetector')
+    const dir = await mkdtemp(join(tmpdir(), 'unwater-det-'))
+    try {
+      const imagePath = await makeTextFixture(dir)
+      const res = await autoDetect(imagePath, undefined, join(process.cwd(), 'models'))
+      expect(res.found).toBe(true)
+      expect(res.regions.length).toBeGreaterThan(0)
+
+      // Decode the returned mask and check coverage.
+      const base64 = res.maskPng.replace(/^data:image\/png;base64,/, '')
+      const { data, info } = await sharp(Buffer.from(base64, 'base64'))
+        .raw()
+        .toBuffer({ resolveWithObject: true })
+      expect(info.width).toBe(W)
+      expect(info.height).toBe(H)
+
+      const px = (x: number, y: number): number => data[(y * info.width + x) * info.channels]
+      // Center (where the text is) should be masked (white).
+      expect(px(Math.round(W / 2), Math.round(H / 2))).toBe(255)
+      // A corner (clean white background) should NOT be masked.
+      expect(px(5, 5)).toBe(0)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 600_000)
+})

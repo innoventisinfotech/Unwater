@@ -9,11 +9,11 @@ import { buildMask } from './maskBuilder'
 // Reuse a single loaded detector across calls.
 let textDetector: TextDetector | undefined
 
-async function ensureTextDetector(onProgress?: (f: number) => void): Promise<TextDetector> {
-  const modelPath = await ensureModel(getModel('ppocr_det'), {
-    destDir: getModelsDir(),
-    onProgress
-  })
+async function ensureTextDetector(
+  destDir: string,
+  onProgress?: (f: number) => void
+): Promise<TextDetector> {
+  const modelPath = await ensureModel(getModel('ppocr_det'), { destDir, onProgress })
   if (!textDetector || !textDetector.loaded) {
     textDetector = new TextDetector()
     await textDetector.load(modelPath)
@@ -24,12 +24,16 @@ async function ensureTextDetector(onProgress?: (f: number) => void): Promise<Tex
 /**
  * Auto-detect text watermarks in an image and return a white-on-black PNG mask (base64 data URL)
  * at source resolution, plus the detected regions. `onDownload` reports model-download progress.
+ * `modelsDir` defaults to the app's project-local models dir; tests pass it explicitly so the
+ * detector can run outside the Electron runtime.
  */
 export async function autoDetect(
   imagePath: string,
-  onDownload?: (f: number) => void
+  onDownload?: (f: number) => void,
+  modelsDir?: string
 ): Promise<AutoDetectResult> {
-  const detector = await ensureTextDetector(onDownload)
+  const destDir = modelsDir ?? getModelsDir()
+  const detector = await ensureTextDetector(destDir, onDownload)
   const { conf, width, height } = await detector.detect(imagePath)
 
   const { mask, regions, found } = buildMask(conf, width, height, {
