@@ -4,7 +4,7 @@
  */
 
 export type Tier = 'tier1' | 'tier2'
-export type ModelId = 'lama' | 'migan' | 'powerpaint' | 'sdxl'
+export type ModelId = 'lama' | 'ppocr_det' | 'migan' | 'powerpaint' | 'sdxl'
 
 /** A single downloadable file belonging to a model. */
 export interface ModelFile {
