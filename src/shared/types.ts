@@ -67,12 +67,34 @@ export interface InputFile {
   height: number
 }
 
+export interface DetectRegion {
+  x: number
+  y: number
+  w: number
+  h: number
+  kind: 'text' | 'logo'
+  score: number
+}
+
+export interface AutoDetectReq {
+  jobId: string
+  inputPath: string
+}
+
+export interface AutoDetectResult {
+  /** White-on-black PNG mask as a base64 data URL, at source resolution. */
+  maskPng: string
+  regions: DetectRegion[]
+  found: boolean
+}
+
 /** IPC channel names — single source of truth to avoid stringly-typed drift. */
 export const Channels = {
   ping: 'app:ping',
   modelsList: 'models:list',
   dialogOpenInput: 'dialog:openInput',
   dialogChooseOutputDir: 'dialog:chooseOutputDir',
+  detectAuto: 'detect:auto',
   jobProcessImage: 'job:processImage',
   jobCancel: 'job:cancel',
   jobProgress: 'job:progress'
