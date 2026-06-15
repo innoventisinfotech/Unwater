@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import {
   Channels,
+  type AutoDetectReq,
+  type AutoDetectResult,
   type InputFile,
   type JobProgress,
   type ModelStatus,
@@ -20,6 +22,9 @@ const api = {
   openInput: (): Promise<InputFile | null> => ipcRenderer.invoke(Channels.dialogOpenInput),
 
   chooseOutputDir: (): Promise<string | null> => ipcRenderer.invoke(Channels.dialogChooseOutputDir),
+
+  autoDetect: (req: AutoDetectReq): Promise<AutoDetectResult> =>
+    ipcRenderer.invoke(Channels.detectAuto, req),
 
   processImage: (req: ProcessImageReq): Promise<ProcessResult> =>
     ipcRenderer.invoke(Channels.jobProcessImage, req),

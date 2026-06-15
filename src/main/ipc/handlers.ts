@@ -4,6 +4,8 @@ import { basename, dirname, extname, join } from 'path'
 import sharp from 'sharp'
 import {
   Channels,
+  type AutoDetectReq,
+  type AutoDetectResult,
   type InputFile,
   type JobProgress,
   type ModelStatus,
@@ -15,6 +17,7 @@ import { getModel } from '../models/registry'
 import { ensureModel, probeFile } from '../models/manager'
 import { getModelsDir } from '../models/paths'
 import { Tier1Engine } from '../engines/tier1'
+import { autoDetect } from '../detect/autoDetector'
 import { JobQueue } from '../jobs/queue'
 
 const queue = new JobQueue()
@@ -87,6 +90,29 @@ export function registerIpc(): void {
   ipcMain.handle(Channels.jobCancel, (_e, jobId: string) => {
     queue.cancel(jobId)
   })
+
+  ipcMain.handle(
+    Channels.detectAuto,
+    async (event, req: AutoDetectReq): Promise<AutoDetectResult> => {
+      queue.begin(req.jobId)
+      try {
+        emit(event, { jobId: req.jobId, phase: 'detect', current: 0, total: 100, message: 'Detecting watermark' })
+        const result = await autoDetect(req.inputPath, (f) =>
+          emit(event, {
+            jobId: req.jobId,
+            phase: 'download',
+            current: Math.round(f * 100),
+            total: 100,
+            message: 'Downloading detector model'
+          })
+        )
+        emit(event, { jobId: req.jobId, phase: 'detect', current: 100, total: 100, message: 'Detection complete' })
+        return result
+      } finally {
+        queue.end(req.jobId)
+      }
+    }
+  )
 
   ipcMain.handle(
     Channels.jobProcessImage,
