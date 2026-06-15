@@ -4,6 +4,8 @@ export interface MaskCanvasHandle {
   /** Export the mask as a white-on-black PNG data URL at source resolution. */
   exportMaskDataUrl: () => string
   clear: () => void
+  /** Paint an external (detected) white-on-black mask onto the editable mask layer. */
+  loadMaskDataUrl: (url: string) => void
 }
 
 interface Props {
@@ -54,7 +56,20 @@ const MaskCanvas = forwardRef<MaskCanvasHandle, Props>(function MaskCanvas(
         if (m) t.drawImage(m, 0, 0)
         return tmp.toDataURL('image/png')
       },
-      clear: () => maskRef.current?.getContext('2d')?.clearRect(0, 0, width, height)
+      clear: () => maskRef.current?.getContext('2d')?.clearRect(0, 0, width, height),
+      loadMaskDataUrl: (url: string) => {
+        const m = maskRef.current
+        const ctx = m?.getContext('2d')
+        if (!m || !ctx) return
+        const img = new Image()
+        img.onload = () => {
+          ctx.clearRect(0, 0, width, height)
+          // The detected mask PNG is white-on-black; the mask layer is shown at 50% opacity,
+          // so drawing it directly reproduces the painted look and exports cleanly.
+          ctx.drawImage(img, 0, 0, width, height)
+        }
+        img.src = url
+      }
     }),
     [width, height]
   )

@@ -10,6 +10,8 @@ function App() {
   const [progress, setProgress] = useState<JobProgress | null>(null)
   const [result, setResult] = useState<ProcessResult | null>(null)
   const [error, setError] = useState('')
+  const [detecting, setDetecting] = useState(false)
+  const [notice, setNotice] = useState('')
 
   const maskRef = useRef<MaskCanvasHandle>(null)
   const jobIdRef = useRef<string>('')
@@ -22,6 +24,7 @@ function App() {
     setInput(file)
     setResult(null)
     setError('')
+    setNotice('')
     setProgress(null)
   }
 
@@ -33,6 +36,71 @@ function App() {
     jobIdRef.current = jobId
     setProcessing(true)
     setError('')
+    setResult(null)
+    try {
+      const res = await window.api.processImage({
+        jobId,
+        inputPath: input.path,
+        maskPng,
+        tier: 'tier1',
+        model: 'lama'
+      })
+      setResult(res)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setProcessing(false)
+      setProgress(null)
+    }
+  }
+
+  async function autoDetect(): Promise<void> {
+    if (!input) return
+    const jobId = crypto.randomUUID()
+    jobIdRef.current = jobId
+    setDetecting(true)
+    setError('')
+    setNotice('')
+    try {
+      const res = await window.api.autoDetect({ jobId, inputPath: input.path })
+      if (!res.found) {
+        setNotice('No watermark detected — draw it manually with the brush or rectangle.')
+        return
+      }
+      maskRef.current?.loadMaskDataUrl(res.maskPng)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDetecting(false)
+      setProgress(null)
+    }
+  }
+
+  async function autoRemove(): Promise<void> {
+    if (!input) return
+    setError('')
+    setNotice('')
+    const detectJob = crypto.randomUUID()
+    jobIdRef.current = detectJob
+    setDetecting(true)
+    let maskPng: string
+    try {
+      const res = await window.api.autoDetect({ jobId: detectJob, inputPath: input.path })
+      if (!res.found) {
+        setNotice('No watermark detected — draw it manually with the brush or rectangle.')
+        return
+      }
+      maskPng = res.maskPng
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      return
+    } finally {
+      setDetecting(false)
+    }
+    // Hand the detected mask straight to the existing image pipeline.
+    const jobId = crypto.randomUUID()
+    jobIdRef.current = jobId
+    setProcessing(true)
     setResult(null)
     try {
       const res = await window.api.processImage({
@@ -105,6 +173,20 @@ function App() {
               >
                 Clear mask
               </button>
+              <button
+                onClick={autoDetect}
+                disabled={detecting || processing}
+                className="rounded bg-sky-700 px-3 py-1 text-xs hover:bg-sky-600 disabled:opacity-50"
+              >
+                {detecting ? 'Detecting…' : 'Auto-detect'}
+              </button>
+              <button
+                onClick={autoRemove}
+                disabled={detecting || processing}
+                className="rounded bg-sky-600 px-3 py-1 text-xs font-medium hover:bg-sky-500 disabled:opacity-50"
+              >
+                Auto-remove
+              </button>
               <div className="ml-auto flex gap-2">
                 {processing ? (
                   <button onClick={cancel} className="rounded bg-red-600 px-4 py-1.5 text-sm hover:bg-red-500">
@@ -133,6 +215,12 @@ function App() {
                     style={{ width: `${progress.total ? (progress.current / progress.total) * 100 : 0}%` }}
                   />
                 </div>
+              </div>
+            )}
+
+            {notice && (
+              <div className="w-full max-w-2xl rounded border border-amber-800 bg-amber-950/40 px-4 py-2 text-sm text-amber-200">
+                {notice}
               </div>
             )}
 
