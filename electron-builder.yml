@@ -1,0 +1,20 @@
+# electron-builder packaging config.
+# NOTE: fully wired in Phase 6. This stub exists so the build target is documented early.
+appId: com.unwater.app
+productName: Unwater
+asar: true
+files:
+  - 'out/**/*'
+  - 'resources/**/*'
+directories:
+  buildResources: resources
+win:
+  target: nsis
+  artifactName: 'Unwater-${version}-win-x64.${ext}'
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+mac:
+  target: dmg
+  category: public.app-category.photography
+  hardenedRuntime: true

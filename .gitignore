@@ -1,0 +1,9 @@
+node_modules/
+out/
+dist/
+*.log
+.DS_Store
+
+# Downloaded AI models (kept in-project per user requirement, never committed)
+/models/
+/resources/models/*.onnx
