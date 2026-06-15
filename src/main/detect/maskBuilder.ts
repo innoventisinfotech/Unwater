@@ -23,11 +23,35 @@ export interface Region {
 export interface BuildMaskOptions {
   /** 0..255 threshold on the confidence map (≈0.3*255 = 77 for DBNet). */
   threshold: number
-  /** Square structuring-element radius to pad detections so inpaint fully covers them. */
-  dilateRadius: number
   /** Connected components smaller than this (pixels) are discarded as noise. */
   minArea: number
   kind: 'text' | 'logo'
+  /**
+   * Fixed square-SE dilation radius. If omitted, the radius is derived adaptively from the
+   * detected text thickness (DBNet emits a SHRUNK kernel, so a thin raw mask under-covers the
+   * watermark — we must expand it to the full glyph extent).
+   */
+  dilateRadius?: number
+  /** When deriving the radius: radius = clamp(thickness * expandFactor, minDilate, maxDilate). */
+  expandFactor?: number
+  minDilate?: number
+  maxDilate?: number
+}
+
+/**
+ * Estimate how far to dilate a detected text region. Thickness ≈ area / longest side (the long
+ * side ≈ the text run length, so area/length ≈ the perpendicular stroke-band thickness). We
+ * expand by `factor` to recover the full glyph extent from DBNet's shrunk kernel.
+ */
+export function adaptiveDilateRadius(
+  box: DetectedBox,
+  factor: number,
+  minRadius: number,
+  maxRadius: number
+): number {
+  const longSide = Math.max(box.x1 - box.x0, box.y1 - box.y0, 1)
+  const thickness = box.area / longSide
+  return Math.max(minRadius, Math.min(maxRadius, Math.round(thickness * factor)))
 }
 
 export interface BuildMaskResult {
@@ -130,10 +154,12 @@ export function buildMask(
   const { labels, boxes } = connectedComponents(bin, width, height)
   const kept = new Set<number>()
   const regions: Region[] = []
+  let largestKept: DetectedBox | undefined
   for (let b = 0; b < boxes.length; b++) {
     const box = boxes[b]
     if (box.area < opts.minArea) continue
     kept.add(b + 1) // labels are 1-based in component order
+    if (!largestKept || box.area > largestKept.area) largestKept = box
     regions.push({
       x: box.x0,
       y: box.y0,
@@ -146,6 +172,18 @@ export function buildMask(
   // Rebuild a mask containing only kept components, then dilate for inpaint padding.
   const filtered = new Uint8Array(width * height)
   for (let i = 0; i < filtered.length; i++) if (kept.has(labels[i])) filtered[i] = 255
-  const mask = dilate(filtered, width, height, opts.dilateRadius)
+
+  // DBNet emits a shrunk kernel — a fixed tiny dilation under-covers the watermark. Derive a
+  // generous radius from the detected text thickness unless an explicit radius is given.
+  let radius = opts.dilateRadius ?? 0
+  if (opts.dilateRadius === undefined && largestKept) {
+    radius = adaptiveDilateRadius(
+      largestKept,
+      opts.expandFactor ?? 1.5,
+      opts.minDilate ?? 4,
+      opts.maxDilate ?? 64
+    )
+  }
+  const mask = dilate(filtered, width, height, radius)
   return { mask, regions, found: regions.length > 0 }
 }

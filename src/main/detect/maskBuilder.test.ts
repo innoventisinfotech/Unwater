@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { binarizeConfidence, dilate, connectedComponents, buildMask } from './maskBuilder'
+import {
+  binarizeConfidence,
+  dilate,
+  connectedComponents,
+  buildMask,
+  adaptiveDilateRadius
+} from './maskBuilder'
 
 describe('binarizeConfidence', () => {
   it('thresholds 0..255 confidence to 0/255', () => {
@@ -39,6 +45,36 @@ describe('connectedComponents', () => {
     expect(a).toMatchObject({ x0: 0, y0: 0, x1: 2, y1: 1, area: 2 })
     const b = boxes.find((b) => b.x0 === 4)!
     expect(b).toMatchObject({ x0: 4, y0: 2, x1: 5, y1: 3, area: 1 })
+  })
+})
+
+describe('adaptiveDilateRadius', () => {
+  it('derives the radius from a region\'s thickness (area / longest side) * factor', () => {
+    // a 40x4 horizontal bar: thickness = 160/40 = 4 → 4*1.5 = 6
+    expect(adaptiveDilateRadius({ x0: 0, y0: 0, x1: 40, y1: 4, area: 160 }, 1.5, 4, 64)).toBe(6)
+  })
+
+  it('clamps to the min and max bounds', () => {
+    expect(adaptiveDilateRadius({ x0: 0, y0: 0, x1: 100, y1: 1, area: 100 }, 1.5, 8, 64)).toBe(8) // thin → min
+    expect(adaptiveDilateRadius({ x0: 0, y0: 0, x1: 10, y1: 10, area: 100 }, 1.5, 4, 12)).toBe(12) // thick → max
+  })
+})
+
+describe('buildMask adaptive dilation', () => {
+  it('expands a thin detected bar well beyond its own thickness when no fixed radius is given', () => {
+    const W = 80
+    const H = 40
+    const conf = new Uint8Array(W * H)
+    // a 40-wide x 4-tall bar at y=18..21, x=20..59 (area 160, thickness 4 → radius 6)
+    for (let y = 18; y < 22; y++) for (let x = 20; x < 60; x++) conf[y * W + x] = 200
+    const res = buildMask(conf, W, H, { threshold: 77, minArea: 16, kind: 'text', expandFactor: 1.5 })
+    expect(res.found).toBe(true)
+    // bar center is masked
+    expect(res.mask[20 * W + 40]).toBe(255)
+    // 6px above the bar top (y=18-6=12) is now masked thanks to adaptive dilation
+    expect(res.mask[12 * W + 40]).toBe(255)
+    // far above (y=5) is NOT masked
+    expect(res.mask[5 * W + 40]).toBe(0)
   })
 })
 

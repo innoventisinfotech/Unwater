@@ -7,3 +7,6 @@ dist/
 # Downloaded AI models (kept in-project per user requirement, never committed)
 /models/
 /resources/models/*.onnx
+
+# Local diagnostic artifacts
+/.debug/

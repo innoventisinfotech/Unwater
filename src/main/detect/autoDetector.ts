@@ -37,10 +37,14 @@ export async function autoDetect(
   const { conf, width, height } = await detector.detect(imagePath)
 
   const { mask, regions, found } = buildMask(conf, width, height, {
-    threshold: 77, // ≈ 0.3 * 255
-    dilateRadius: Math.max(2, Math.round(Math.min(width, height) * 0.004)),
+    threshold: 51, // ≈ 0.2 * 255 — catch fainter / semi-transparent watermarks
     minArea: Math.max(16, Math.round(width * height * 0.00002)),
-    kind: 'text'
+    kind: 'text',
+    // DBNet emits a shrunk kernel; expand generously from the detected text thickness so the
+    // mask covers the full glyphs (a too-thin mask leaves the watermark after inpainting).
+    expandFactor: 1.6,
+    minDilate: 4,
+    maxDilate: Math.max(24, Math.round(Math.min(width, height) * 0.08))
   })
 
   if (!found) {
